@@ -1,29 +1,55 @@
 services:
+  # Application service built from the project's Dockerfile.
+  # See: https://docs.docker.com/compose/compose-file/build/
   app:
     build:
       context: .
       dockerfile: Dockerfile
+    # Expose the web app on port 3000 so it is reachable from the browser.
+    # See: https://docs.docker.com/compose/compose-file/ports/
     ports:
       - "3000:3000"
     environment:
+      # The app reads this value in src/setups/mongoose.setup.js.
+      # See: https://docs.docker.com/compose/compose-file/compose-file-v3/#environment
       port: 3000
       MONGODB_URI: mongodb://mongo:27017/url-shortener
     depends_on:
+      # Wait until MongoDB reports healthy before starting the app.
+      # See: https://docs.docker.com/compose/compose-file/compose-file-v3/#depends_on
       mongo:
         condition: service_healthy
 
+  # MongoDB service for storing URL data.
+  # See: https://hub.docker.com/_/mongo
   mongo:
     image: mongo:6
+    # Keep MongoDB internal to the Compose network. The app reaches it via the service name "mongo".
+    # See: https://docs.docker.com/compose/networking/
     expose:
       - "27017"
     volumes:
+      # Persist database data across container restarts.
+      # See: https://docs.docker.com/storage/volumes/
       - mongo-data:/data/db
     healthcheck:
+      # Verify MongoDB is accepting connections before the app starts.
+      # This runs a lightweight MongoDB command inside the container:
+      # - "CMD" tells Docker to execute the following command.
+      # - "mongosh" is the MongoDB shell client used to talk to the database.
+      # - "--quiet" suppresses shell banners so the output stays minimal.
+      # - "--eval" runs a small JavaScript expression without opening an interactive shell.
+      # - "db.adminCommand('ping').ok" sends a ping to the server and checks that it returns success.
+      # See: https://docs.docker.com/compose/compose-file/compose-file-v3/#healthcheck
+      # See: https://www.mongodb.com/docs/mongodb-shell/
+      # See: https://www.mongodb.com/docs/manual/reference/command/ping/
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
 
+# Named volume used by MongoDB to persist data.
+# See: https://docs.docker.com/storage/volumes/
 volumes:
   mongo-data:
